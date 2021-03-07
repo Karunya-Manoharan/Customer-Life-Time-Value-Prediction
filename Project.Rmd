@@ -1,0 +1,413 @@
+---
+title: "Data Mining Exploration"
+author: "Karunya Manoharan"
+date: "5/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+setwd("D:/CMU/Sem 2/Mini 4/Data Mining/Project")
+
+library(ggplot2)
+library(readr)
+ltv_Dataset <- read_csv("ltv_Dataset1.csv")
+
+```
+
+## R Markdown
+
+Normalize date
+
+```{r cars}
+ltv_Dataset$Date_ID<-NA
+for(i in 1:nrow(ltv_Dataset))
+{
+  if(i ==1)
+  {
+    id = ltv_Dataset$id[1]
+    st_date = ltv_Dataset$date[1]
+  }
+  else
+  {
+    if(id!=ltv_Dataset$id[i])
+    {
+      id = ltv_Dataset$id[i]
+      st_date = ltv_Dataset$date[i]
+    }
+  }
+  ltv_Dataset$Date_ID[i]<- -1*difftime(strptime(st_date,"%m/%d/%Y"), strptime(ltv_Dataset$date[i],"%m/%d/%Y"),units = "days")
+  print(i)
+  print(ltv_Dataset$Date_ID[i])
+}
+
+ltv_Dataset$Date_T<-NA
+for(i in 1:nrow(ltv_Dataset))
+{
+  if(any(ltv_Dataset$status[which(ltv_Dataset$id==ltv_Dataset$id[i])]==2))
+  {
+    if(i ==1)
+  {
+    id = ltv_Dataset$id[1]
+    end_date = tail(ltv_Dataset$Date_ID[which(ltv_Dataset$id==1)], n=1)
+  }
+  else
+  {
+    if(id!=ltv_Dataset$id[i])
+    {
+      id = ltv_Dataset$id[i]
+      end_date = tail(ltv_Dataset$Date_ID[which(ltv_Dataset$id==id)], n=1)
+    }
+  }
+  ltv_Dataset$Date_T[i]<- ltv_Dataset$Date_ID[i]/end_date
+  print(i)
+  print(ltv_Dataset$Date_T[i])
+
+  }
+}
+
+ltv_Dataset$Time_Diff<-NA
+users = unique(ltv_Dataset$id)
+for(i in 1:nrow(ltv_Dataset))
+{
+  if(i==1)
+  {
+    pr_id = ltv_Dataset$id[i]
+    ltv_Dataset$Time_Diff[i] = 0
+  }
+  else
+  {
+    if(pr_id==ltv_Dataset$id[i])
+    {
+      ltv_Dataset$Time_Diff[i] = ltv_Dataset$Date_ID[i] - ltv_Dataset$Date_ID[i-1]
+      pr_id = ltv_Dataset$id[i]
+    }
+    else
+    {
+      pr_id = ltv_Dataset$id[i]
+      ltv_Dataset$Time_Diff[i] = 0
+    }
+  }
+  print(i)
+}
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+cor(ltv_Dataset$pages, ltv_Dataset$Date_ID)
+cor(ltv_Dataset$pages, ltv_Dataset$Date_T, use = "complete.obs")
+cor(ltv_Dataset$onsite, ltv_Dataset$Date_ID, use = "complete.obs")
+cor(ltv_Dataset$onsite, ltv_Dataset$Date_T, use = "complete.obs")
+
+cor(ltv_Dataset$entered, ltv_Dataset$Date_ID, use = "complete.obs")
+cor(ltv_Dataset$entered, ltv_Dataset$Date_T, use = "complete.obs")
+
+cor(ltv_Dataset$completed, ltv_Dataset$Date_ID, use = "complete.obs")
+cor(ltv_Dataset$completed, ltv_Dataset$Date_T, use = "complete.obs")
+
+cor(ltv_Dataset$holiday, ltv_Dataset$Date_ID, use = "complete.obs")
+cor(ltv_Dataset$holiday, ltv_Dataset$Date_T, use = "complete.obs")
+
+```
+
+```{r}
+ggplot(ltv_Dataset, aes(x = ltv_Dataset$Date_T, y = ltv_Dataset$pages)) + geom_boxplot()
+```
+
+```{r}
+ggplot(ltv_Dataset, aes(x = ltv_Dataset$Date_T, y = ltv_Dataset$pages))  + stat_binhex()
+```
+
+```{r}
+ggplot(ltv_Dataset, aes(x = ltv_Dataset$Date_T, y = ltv_Dataset$onsite))  + stat_binhex()
+```
+
+```{r}
+ggplot(ltv_Dataset, aes(x = ltv_Dataset$Date_T, y = ltv_Dataset$entered))  + stat_binhex()
+```
+
+
+
+
+
+
+
+```{r}
+ggplot(ltv_Dataset, aes(x = ltv_Dataset$Date_T, y = ltv_Dataset$completed))  + stat_binhex()
+```
+
+```{r}
+ggplot(ltv_Dataset, aes(x = ltv_Dataset$Date_T, y = ltv_Dataset$holiday))  + stat_binhex()
+```
+
+```{r}
+Users<-data.frame(matrix(0,nrow = length(unique(ltv_Dataset$id)),ncol = 3))
+Users[,1]<-unique(ltv_Dataset$id)
+for(i in 1:nrow(Users))
+{
+  Users[i,2]<-ltv_Dataset$gender[which(ltv_Dataset$id==Users[i,1])][1]
+  Users[i,3]<-tail(ltv_Dataset$Date_ID[which(ltv_Dataset$id==Users[i,1])], n = 1)
+  print(i)
+}
+
+colnames(Users)<-c("id","Gender","Life")
+
+Users$avg_diff<-NA
+Users$Status<-NA
+
+for(i in 1:nrow(Users))
+{
+  Users$avg_diff[i]<-mean(ltv_Dataset$Date_ID[which(ltv_Dataset$id==Users[i,1])])
+  Users$Status[i]<-max(ltv_Dataset$status[which(ltv_Dataset$id==Users[i,1])])
+  print(i)
+}
+
+Users1 <- ltv_Dataset %>%
+  filter(ltv_Dataset$status !=2) %>%
+   group_by(id) %>%
+  summarize(avg_pages = mean(pages), avg_onsite = mean(onsite), avg_ent = mean(entered), tot_ent = sum(entered), avg_com = mean(completed), tot_com = sum(completed), avg_hol = mean(holiday), tot_hol = sum(holiday)) 
+
+Users<-merge(Users, Users1, by = "id")
+colnames(Users)[4:5]<-c("avg_diff", "Status")
+
+Users$Frequency<-NA
+for(i in 1:nrow(Users))
+{
+  Users$Frequency[i]<-Users$Life[i]/nrow(ltv_Dataset[which(ltv_Dataset$id==Users[i,1]),1])
+}
+
+Users$log.onsite<-NA
+for(i in 1:nrow(Users))
+{
+  Users$log.onsite[i]<-mean(log(ltv_Dataset$onsite[which(ltv_Dataset$id==Users[i,1])]))
+}
+
+Users1 <- ltv_Dataset %>%
+  filter(ltv_Dataset$status !=2) %>%
+   group_by(id) %>%
+  summarize( recency = floor(difftime(strptime("12/31/2014","%m/%d/%Y"), max(strptime((date),"%m/%d/%Y")),units = "days")) )
+
+Users1 <- ltv_Dataset %>%
+  filter(ltv_Dataset$status !=2) %>%
+   group_by(id) %>%
+  summarize( log.onsite = mean(log(1+onsite))) 
+```
+
+```{r}
+ggplot(Users, aes(x = Users$X3, color = factor(Users$X2)))  + geom_histogram()
+table(ltv_Dataset$gender)
+```
+
+```{r}
+Users2<-Users
+Users2$recency_frac<-Users2$recency/Users2$Life
+Users2$recency<-as.numeric(Users2$recency)
+Users2$recency_frac<-as.numeric(Users2$recency_frac)
+Users2[,3:4]<-scale(Users2[,3:4])
+Users2[,6:15]<-scale(Users2[,6:15])
+Users2$Male<-ifelse(
+  Users2$Gender=="M", 1, 0
+)
+Users2<-Users2[,!names(Users2) %in% c("Gender", "id")]
+
+hcl_cl1<-agnes(Users2[which(Users2$Status!=2),], diss = F, stand = T, method = "ward")
+
+pltree(hcl_cl1, cex = 0.6, hang = -1, main = "Dendrogram of agnes") 
+
+sub_grp<-cutree(hcl_cl1, k=3)
+
+table(sub_grp)
+
+Users2<-cbind(Users2, Users$id)
+Users3<-Users2[which(Users2$Status!=2),]
+Users4<-Users[which(Users$Status!=2),]
+
+
+Users3<-Users3 %>%
+  mutate(cluster = sub_grp)
+
+Users4<-Users4 %>%
+  mutate(cluster = sub_grp)
+
+write.csv(Users4,"Users4.csv")
+write.csv(Users3,"Users3.csv")
+```
+
+```{r}
+# checking correlation between features
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = pmax(1, cex.cor * r))
+}
+
+var.names <- colnames(Users2)
+pairs(Users2[,var.names], lower.panel = panel.cor)
+
+res <- cor(Users2)
+round(res, 2)
+
+Users5 <- subset(Users2, select = -c(avg_diff, tot_ent, tot_com, tot_hol, avg_com, avg_onsite))
+
+hcl_cl1<-agnes(Users5[which(Users5$Status!=2 & Users5$Status!=0),], diss = F, stand = T, method = "ward")
+
+pltree(hcl_cl1, cex = 0.6, hang = -1, main = "Dendrogram of agnes") 
+
+sub_grp<-cutree(hcl_cl1, k=4)
+
+table(sub_grp)
+
+Users6<-Users[which(Users$Status!=2 & Users$Status!=0),]
+
+Users6<-Users6 %>%
+  mutate(cluster = sub_grp)
+
+Users6<-cbind(Users6, Users2$recency_frac[which(Users2$Status!=2 & Users2$Status!=0)])
+write.csv(Users6,"Users7.csv")
+
+```
+
+```{r}
+#Users8<- Users %>%
+#  filter(!recency<90 & Status==1)
+
+for(i in 1:nrow(Users))
+{
+  if(Users$Status[i]==2)
+  {
+    Users$recency[i]<-ltv_Dataset$Date_ID[which(ltv_Dataset$id==Users[i,1] & ltv_Dataset$status==2)]
+  }
+}
+
+ltv_Dataset$time.since.last.order<-NA
+time = 0
+id=1
+
+for(i in 1:nrow(ltv_Dataset))
+{
+  if(ltv_Dataset$id[i]==id)
+  {
+    time = time+ltv_Dataset$Time_Diff[i]
+   ltv_Dataset$time.since.last.order[i]<-time
+   
+   if(ltv_Dataset$completed[i]==1)
+   {time = 0}
+  }
+  else
+  {
+    id = ltv_Dataset$id[i]
+    ltv_Dataset$time.since.last.order[i]<-0
+    time = 0
+  }
+}
+
+Users1<- ltv_Dataset %>%
+  group_by(id) %>%
+  summarize(avg_timediff = mean(Time_Diff), avg.time.since.last=mean(time.since.last.order))
+
+Users<-merge(Users,Users1,by="id")
+#Users8$y<-NA
+#Users8$y<-ifelse(Users8$recency<90, 1, 0)
+
+Users8<-Users[which(Users$Status==2),!names(Users) %in% c("id","X","avg_diff")]
+
+```
+
+```{r}
+set.seed(981)
+
+# Upsample the data to artifically overcome sample imbalance
+more.idx <- sample(c(0,1), 15000, replace = TRUE)
+upsample <- rbind(Users8, Users8[more.idx, ])
+
+# Randomly select 20% of the data to be held out for model validation
+test.indexes <- sample(1:nrow(upsample), 
+                       round(0.2 * nrow(upsample)))
+train.indexes <- setdiff(1:nrow(upsample), test.indexes)
+
+# Just pull the covariates available to marketers (cols 1:8) and the outcome (col 17)
+Users.train <- upsample[train.indexes, ]
+Users.test <- upsample[test.indexes, ]
+```
+
+```{r}
+#Users.train$y<-as.factor(as.character(Users.train$y))
+Users.rf <- randomForest(Life ~ .,data=Users8, importance=TRUE)
+
+Users.rf
+```
+
+```{r}
+importance(Users.rf)
+varImpPlot(Users.rf)
+```
+
+```{r}
+predict.rf<-predict(Users.rf, Users.test[,!names(Users.test) %in% c("Life")])
+
+RMSE(predict.rf,Users.test$Life)
+```
+
+```{r}
+Users.pred<-Users[which(Users$Status==1),]
+
+predict.rf<-predict(Users.rf, Users.pred[,!names(Users.pred) %in% c("Life","id","X")])
+
+Users9<-cbind(Users.pred, predict.rf)
+```
+
+```{r}
+Users$y<-NA
+Users$y<-ifelse(Users$Status==2,1,0)
+
+Users8<-Users[which(Users$Status!=0),!names(Users) %in% c("id","X","Status")]
+set.seed(981)
+
+# Upsample the data to artifically overcome sample imbalance
+more.idx <- sample(c(0,1), 15000, replace = TRUE)
+upsample <- rbind(Users8, Users8[more.idx, ])
+
+# Randomly select 20% of the data to be held out for model validation
+test.indexes <- sample(1:nrow(upsample), 
+                       round(0.2 * nrow(upsample)))
+train.indexes <- setdiff(1:nrow(upsample), test.indexes)
+
+# Just pull the covariates available to marketers (cols 1:8) and the outcome (col 17)
+Users.train <- upsample[train.indexes, ]
+Users.test <- upsample[test.indexes, ]
+
+```
+
+```{r}
+Users.train$y<-as.factor(as.character(Users.train$y))
+Users.rf <- randomForest(y ~ .,data=Users.train, importance=TRUE)
+
+Users.rf
+
+```
+
+```{r}
+importance(Users.rf)
+varImpPlot(Users.rf)
+
+```
+
+```{r}
+predict.rf<-predict(Users.rf, Users.test[,!names(Users.test) %in% c("y")], type = "prob")
+
+Users.test$y<-as.factor(as.character(Users.test$y))
+y.predict<-ifelse(predict.rf[,2]>0.5,1,0)
+y.predict<-as.factor(as.character(y.predict))
+
+confusionMatrix(y.predict, Users.test$y)
+```
+
